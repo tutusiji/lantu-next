@@ -40,6 +40,12 @@ export function initDb() {
       icon TEXT,
       display_order INTEGER DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL
+    );
   `);
 }
 
@@ -50,6 +56,25 @@ export function getLayers() {
     .all();
 }
 
+// 更新层级
+export function updateLayer(
+  id: number,
+  name: string,
+  icon: string,
+  display_order: number,
+) {
+  const stmt = db.prepare(
+    "UPDATE layers SET name = ?, icon = ?, display_order = ? WHERE id = ?",
+  );
+  return stmt.run(name, icon, display_order, id);
+}
+
+// 删除层级
+export function deleteLayer(id: number) {
+  const stmt = db.prepare("DELETE FROM layers WHERE id = ?");
+  return stmt.run(id);
+}
+
 // 获取所有分类
 export function getCategories() {
   return db
@@ -57,6 +82,26 @@ export function getCategories() {
       "SELECT DISTINCT * FROM categories ORDER BY layer_id, display_order",
     )
     .all();
+}
+
+// 更新分类
+export function updateCategory(
+  id: number,
+  name: string,
+  icon: string,
+  layer_id: number,
+  display_order: number,
+) {
+  const stmt = db.prepare(
+    "UPDATE categories SET name = ?, icon = ?, layer_id = ?, display_order = ? WHERE id = ?",
+  );
+  return stmt.run(name, icon, layer_id, display_order, id);
+}
+
+// 删除分类
+export function deleteCategory(id: number) {
+  const stmt = db.prepare("DELETE FROM categories WHERE id = ?");
+  return stmt.run(id);
 }
 
 // 获取所有技术项
@@ -191,6 +236,76 @@ export function getStats() {
     total,
     coverage,
   };
+}
+
+// 批量更新层级顺序
+export function updateLayerOrder(
+  updates: { id: number; display_order: number }[],
+) {
+  const stmt = db.prepare("UPDATE layers SET display_order = ? WHERE id = ?");
+  const updateMany = db.transaction((items) => {
+    for (const item of items) {
+      stmt.run(item.display_order, item.id);
+    }
+  });
+  updateMany(updates);
+}
+
+// 批量更新分类顺序
+export function updateCategoryOrder(
+  updates: { id: number; display_order: number }[],
+) {
+  const stmt = db.prepare(
+    "UPDATE categories SET display_order = ? WHERE id = ?",
+  );
+  const updateMany = db.transaction((items) => {
+    for (const item of items) {
+      stmt.run(item.display_order, item.id);
+    }
+  });
+  updateMany(updates);
+}
+
+// 批量更新技术项顺序
+export function updateTechItemOrder(
+  updates: { id: number; display_order: number }[],
+) {
+  const stmt = db.prepare(
+    "UPDATE tech_items SET display_order = ? WHERE id = ?",
+  );
+  const updateMany = db.transaction((items) => {
+    for (const item of items) {
+      stmt.run(item.display_order, item.id);
+    }
+  });
+  updateMany(updates);
+}
+
+// 清空所有数据
+export function clearDb() {
+  db.transaction(() => {
+    db.prepare("DELETE FROM tech_items").run();
+    db.prepare("DELETE FROM categories").run();
+    db.prepare("DELETE FROM layers").run();
+    db.prepare("DELETE FROM users").run();
+    // 重置自增 ID
+    db.prepare("DELETE FROM sqlite_sequence").run();
+  })();
+}
+
+// 获取用户
+export function getUser(username: string) {
+  return db.prepare("SELECT * FROM users WHERE username = ?").get(username) as
+    | any
+    | undefined;
+}
+
+// 添加用户 (供 seed 使用)
+export function addUser(username: string, password: string) {
+  const stmt = db.prepare(
+    "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
+  );
+  return stmt.run(username, password);
 }
 
 export default db;

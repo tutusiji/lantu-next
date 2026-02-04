@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getLayers, addLayer, initDb } from '@/lib/db';
+import { getLayers, addLayer, updateLayer, deleteLayer, initDb } from '@/lib/db';
 
 initDb();
 
@@ -19,5 +19,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ id: result.lastInsertRowid, name, icon, display_order });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to create layer' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { id, name, icon, display_order } = await request.json();
+    updateLayer(id, name, icon, display_order);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to update layer' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    }
+    deleteLayer(parseInt(id));
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to delete layer' }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Layer, Category, TechItem, Stats } from "@/types";
 import TechCard from "@/components/TechCard";
 import FilterBar from "@/components/FilterBar";
@@ -22,6 +22,17 @@ export default function Home() {
     total: 0,
     coverage: "0.0",
   });
+
+  // 使用 useMemo 对技术项进行分组，避免每次渲染都创建新引用
+  const itemsByCategory = useMemo(() => {
+    const map: Record<number, TechItem[]> = {};
+    techItems.forEach((item) => {
+      if (!map[item.category_id]) map[item.category_id] = [];
+      map[item.category_id].push(item);
+    });
+    return map;
+  }, [techItems]);
+
   const [filter, setFilter] = useState<string>("all");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -34,10 +45,18 @@ export default function Home() {
         fetch("/api/stats", { cache: "no-store" }),
       ]);
 
-      setLayers(await layersRes.json());
-      setCategories(await categoriesRes.json());
-      setTechItems(await itemsRes.json());
-      setStats(await statsRes.json());
+      const [layersData, categoriesData, itemsData, statsData] = await Promise.all([
+        layersRes.json(),
+        categoriesRes.json(),
+        itemsRes.json(),
+        statsRes.json(),
+      ]);
+
+      // 批量更新状态以减少不必要的重渲染
+      setLayers(layersData);
+      setCategories(categoriesData);
+      setTechItems(itemsData);
+      setStats(statsData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
@@ -60,14 +79,12 @@ export default function Home() {
   };
 
   const getCategoryItems = (categoryId: number) => {
-    return techItems.filter(
-      (item) => item.category_id === categoryId && getFilteredItems(item),
-    );
+    const items = itemsByCategory[categoryId] || [];
+    return items.filter((item: TechItem) => getFilteredItems(item));
   };
 
-  // Only used for passing all items to manager, ignoring filter
   const getAllCategoryItems = (categoryId: number) => {
-    return techItems.filter((item) => item.category_id === categoryId);
+    return itemsByCategory[categoryId] || [];
   };
 
   const getLayerCategories = (layerId: number) => {
@@ -75,7 +92,7 @@ export default function Home() {
   };
 
   const renderLayerIcon = (iconName: string) => {
-    // @ts-ignore
+    // @ts-expect-error - 动态图标查找
     const Icon = Icons[iconName];
     if (Icon) return <Icon size={24} />;
     return iconName;
@@ -195,7 +212,7 @@ export default function Home() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {categoryItems.map((item) => (
+                        {categoryItems.map((item: TechItem) => (
                           <TechCard key={item.id} item={item} />
                         ))}
                         {categoryItems.length === 0 && filter === "all" && (

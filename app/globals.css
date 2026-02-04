@@ -25,19 +25,47 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* 全局滚动条优化 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 10px;
+::-webkit-scrollbar-thumb {
+  background: #334155; /* Slate-700 */
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+::-webkit-scrollbar-thumb:hover {
+  background: #475569; /* Slate-600 */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* 兼容 Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+
+/* 针对深色模式微调 */
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: #1e293b; /* Slate-800 */
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+    background-clip: content-box;
+  }
+}
+
+.custom-scrollbar {
+  /* 保持此类名可用，但现在全局已覆盖 */
 }

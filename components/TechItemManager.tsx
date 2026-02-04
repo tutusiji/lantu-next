@@ -39,8 +39,14 @@ export default function TechItemManager({
   const [items, setItems] = useState(initialItems);
 
   useEffect(() => {
-    setItems(initialItems);
-  }, [initialItems]);
+    // 深度比对 initialItems 和 items，确保所有字段变更都能同步到本地状态
+    const serialize = (arr: TechItem[]) => 
+      arr.map(i => `${i.id}-${i.status}-${i.name}-${i.display_order}-${i.is_new}`).join('|');
+    
+    if (serialize(items) !== serialize(initialItems)) {
+      setItems(initialItems);
+    }
+  }, [initialItems, items]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -136,16 +142,20 @@ export default function TechItemManager({
 
     try {
       const method = editingItem.id ? "PUT" : "POST";
-      await fetch("/api/tech-items", {
+      const res = await fetch("/api/tech-items", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingItem),
       });
 
+      if (!res.ok) throw new Error("Failed to save");
+
       setIsEditMode(false);
-      onUpdate();
+      setEditingItem({});
+      onUpdate(); // 触发父组件刷新数据
     } catch (error) {
       console.error("Failed to save tech item:", error);
+      alert("保存失败，请重试");
     }
   };
 

@@ -161,77 +161,20 @@ npm start
 2. 删除 `data/techmap.db` 文件
 3. 重新运行 `npm run seed`
 
-## 内网服务器部署指南
+## 部署
 
-在内网服务器（如 Ubuntu/CentOS）上部署该项目，建议遵循以下步骤：
+### Vercel 部署
 
-### 1. 环境准备
+1. 将代码推送到 GitHub
+2. 在 Vercel 中导入项目
+3. 注意：SQLite 不支持 Vercel 的 serverless 环境，需要换成 PostgreSQL 或其他云数据库
 
-- **Node.js**: 推荐 v18.17.0 或更高版本。
-- **pnpm/npm**: 建议使用 pnpm 以获得更快的安装速度。
-- **PM2**: 用于进程守护，防止应用意外退出。
-
-### 2. 代码部署与安装
+### 本地部署
 
 ```bash
-# 进入项目目录
-cd /path/to/lantu-next
-
-# 安装依赖
-pnpm install
-
-# 初始化数据 (如果是首次部署)
-pnpm run seed
+npm run build
+npm start
 ```
-
-### 3. 构建与启动
-
-```bash
-# 执行构建
-pnpm run build
-
-# 启动服务 (默认端口 4701)
-pnpm run start
-```
-
-### 4. 使用 PM2 进行进程管理
-
-建议使用 PM2 启动应用，并配置端口：
-
-```bash
-# 使用 PM2 启动项目，指定名称和端口
-pm2 start npm --name "lantu-next" -- start -- -p 4701
-
-# 设置开机自启
-pm2 save
-pm2 startup
-```
-
-### 5. Nginx 反向代理配置 (可选但推荐)
-
-如果需要通过域名或 80 端口访问，建议配置 Nginx：
-
-```nginx
-server {
-    listen 80;
-    server_name your.internal.ip;
-
-    location / {
-        proxy_pass http://127.0.0.1:4701;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-### 6. 注意事项
-
-- **数据库权限**: 请确保运行应用的用户对 `data/` 目录及 `data/techmap.db` 文件具有读写权限。
-- **端口冲突**: 项目默认使用 `4701` 端口，如需更改，请在 `package.json` 或 PM2 启动参数中修改。
-- **静态资源**: `public/` 目录下的资源在构建后会自动处理，无需额外配置。
 
 ## License
 
