@@ -64,7 +64,7 @@ npm run seed
 npm run dev
 ```
 
-打开浏览器访问 [http://localhost:3000](http://localhost:3000)
+打开浏览器访问 [http://localhost:4701](http://localhost:4701)
 
 ## 页面说明
 
@@ -236,3 +236,64 @@ server {
 ## License
 
 MIT
+
+
+# 1. 本地重新构建镜像（包含刚才的错误日志修复）
+.\deploy.ps1
+
+# 2. 上传新镜像到服务器后，在服务器执行：
+docker load -i lantu-next-latest.tar
+
+# 3. 停止旧容器
+docker-compose down
+
+# 4. 启动新容器并查看详细日志
+docker-compose up -d
+docker-compose logs -f
+
+
+
+docker run -d -p 4701:4701 \
+  -v ./data:/app/data \
+  --name lantu-next-app \
+  --restart unless-stopped \
+  lantu-next:latest
+
+
+
+本地打包：
+.\deploy.ps1
+
+服务器首次部署：
+# 1. 上传文件
+scp lantu-next-latest.tar docker-compose.yml root@server:/var/www/lantu/
+
+# 2. 加载镜像
+docker load -i lantu-next-latest.tar
+
+# 3. 复制数据并设置权限
+docker run --rm --user root -v ./data:/backup lantu-next:latest sh -c 'cp -r /app/data/* /backup/ && chown -R 1001:1001 /backup'
+
+# 4. 启动
+docker-compose up -d
+
+
+
+后续更新：
+# 1. 停止
+docker-compose down
+
+# 2. 加载新镜像
+docker load -i lantu-next-new.tar
+
+# 3. 启动（数据保留）
+docker-compose up -d
+
+
+# 5. 查看日志确认
+docker-compose logs -f
+
+
+关键点：
+chown -R 1001:1001 - 设置为nextjs用户(uid=1001, gid=1001)
+这样容器内的nextjs用户就有权限读写数据库了

@@ -8,6 +8,7 @@
 - [tech-items 路由](file://app/api/tech-items/route.ts)
 - [stats 路由](file://app/api/stats/route.ts)
 - [login 路由](file://app/api/login/route.ts)
+- [reorder 路由](file://app/api/reorder/route.ts)
 - [数据库模块](file://lib/db.ts)
 - [类型定义](file://types/index.ts)
 - [种子数据脚本](file://lib/seed.ts)
@@ -15,6 +16,13 @@
 - [认证上下文](file://lib/AuthContext.tsx)
 - [布局文件](file://app/layout.tsx)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 新增批量排序API端点，支持层级、分类和技术项的批量顺序更新
+- 扩展数据库功能，新增批量更新排序方法
+- 更新认证机制，增强登录API的安全性和错误处理
+- 完善API文档，包含新的排序功能和改进的错误处理说明
 
 ## 目录
 1. [简介](#简介)
@@ -33,6 +41,8 @@ Lantu Next 是一个基于 Next.js + TypeScript + Tailwind CSS + SQLite 构建�
 
 该系统采用现代前端技术栈，使用 SQLite 作为数据存储，提供直观的管理后台界面和丰富的技术栈展示功能。API 设计遵循 RESTful 原则，支持标准的 HTTP 方法和状态码。
 
+**更新** 新增批量排序功能，支持对层级、分类和技术项进行批量顺序调整，提升管理效率。
+
 ## 项目结构
 
 项目采用 Next.js App Router 架构，API 路由位于 `app/api/` 目录下，数据库操作封装在 `lib/db.ts` 中，类型定义位于 `types/index.ts`。
@@ -50,6 +60,7 @@ CategoriesAPI[分类API]
 TechItemsAPI[技术项API]
 StatsAPI[统计API]
 LoginAPI[登录API]
+ReorderAPI[批量排序API]
 end
 subgraph "数据层"
 DB[(SQLite数据库)]
@@ -62,11 +73,13 @@ UI --> LayersAPI
 UI --> CategoriesAPI
 UI --> TechItemsAPI
 UI --> StatsAPI
+UI --> ReorderAPI
 LayersAPI --> DB
 CategoriesAPI --> DB
 TechItemsAPI --> DB
 StatsAPI --> DB
 LoginAPI --> DB
+ReorderAPI --> DB
 LayersAPI --> Types
 CategoriesAPI --> Types
 TechItemsAPI --> Types
@@ -80,6 +93,8 @@ StatsAPI --> Types
 - [categories 路由](file://app/api/categories/route.ts#L1-L48)
 - [tech-items 路由](file://app/api/tech-items/route.ts#L1-L50)
 - [stats 路由](file://app/api/stats/route.ts#L1-L15)
+- [login 路由](file://app/api/login/route.ts#L1-L20)
+- [reorder 路由](file://app/api/reorder/route.ts#L1-L100)
 
 **章节来源**
 - [README.md](file://README.md#L20-L43)
@@ -89,7 +104,7 @@ StatsAPI --> Types
 
 ### 数据库设计
 
-系统使用 SQLite 作为数据存储，包含四个主要表结构：
+系统使用 SQLite 作为数据存储，包含五个主要表结构，新增用户表支持认证功能。
 
 ```mermaid
 erDiagram
@@ -122,6 +137,12 @@ INTEGER id PK
 TEXT username UK
 TEXT password
 }
+REORDER_QUEUE {
+INTEGER id PK
+TEXT entity_type
+INTEGER entity_id
+INTEGER new_order
+}
 LAYERS ||--o{ CATEGORIES : "包含"
 CATEGORIES ||--o{ TECH_ITEMS : "包含"
 ```
@@ -131,12 +152,13 @@ CATEGORIES ||--o{ TECH_ITEMS : "包含"
 
 ### 类型定义
 
-系统定义了三个核心接口类型，确保前后端数据一致性：
+系统定义了四个核心接口类型，确保前后端数据一致性：
 
 - **Layer**: 层级实体，包含显示序号和图标信息
 - **Category**: 分类实体，关联到具体层级
 - **TechItem**: 技术项实体，包含状态、优先级等属性
 - **Stats**: 统计结果实体，包含活跃数、缺失数、总数和覆盖率
+- **User**: 用户实体，用于认证管理
 
 **章节来源**
 - [类型定义](file://types/index.ts#L1-L34)
@@ -164,6 +186,7 @@ Note over Client,DB : 错误处理统一返回
 - [layers 路由](file://app/api/layers/route.ts#L6-L13)
 - [categories 路由](file://app/api/categories/route.ts#L6-L13)
 - [tech-items 路由](file://app/api/tech-items/route.ts#L7-L14)
+- [reorder 路由](file://app/api/reorder/route.ts#L1-L100)
 
 ## 详细组件分析
 
@@ -312,6 +335,47 @@ end
 **章节来源**
 - [login 路由](file://app/api/login/route.ts#L1-L20)
 
+### 批量排序 API
+
+批量排序 API 提供对层级、分类和技术项的批量顺序更新功能。
+
+#### API 端点
+
+| 方法 | URL | 描述 | 请求体 | 响应 |
+|------|-----|------|--------|------|
+| POST | `/api/reorder` | 批量更新排序 | `{entity_type, updates: [{id, display_order}...]}` | `{success: true}` |
+
+#### 请求参数验证
+
+- **entity_type**: 必填，枚举值: 'layers' | 'categories' | 'tech_items'
+- **updates**: 必填，数组类型，包含 `{id, display_order}` 对象
+- **id**: 数字类型，必须对应存在的实体ID
+- **display_order**: 数字类型，新的显示顺序
+
+#### 批量操作流程
+
+```mermaid
+sequenceDiagram
+participant Client as "客户端"
+participant ReorderAPI as "批量排序API"
+participant DB as "数据库"
+Client->>ReorderAPI : POST /api/reorder
+ReorderAPI->>ReorderAPI : 验证参数
+ReorderAPI->>DB : 开启事务
+loop 对于每个更新
+DB->>DB : 更新单个实体顺序
+end
+DB-->>ReorderAPI : 提交事务
+ReorderAPI-->>Client : {success : true}
+```
+
+**图表来源**
+- [reorder 路由](file://app/api/reorder/route.ts#L1-L100)
+- [数据库模块](file://lib/db.ts#L241-L282)
+
+**章节来源**
+- [reorder 路由](file://app/api/reorder/route.ts#L1-L100)
+
 ## 依赖关系分析
 
 系统各组件之间的依赖关系如下：
@@ -324,6 +388,7 @@ CategoriesRoute[app/api/categories/route.ts]
 TechItemsRoute[app/api/tech-items/route.ts]
 StatsRoute[app/api/stats/route.ts]
 LoginRoute[app/api/login/route.ts]
+ReorderRoute[app/api/reorder/route.ts]
 end
 subgraph "数据访问层"
 DBModule[lib/db.ts]
@@ -341,6 +406,7 @@ CategoriesRoute --> DBModule
 TechItemsRoute --> DBModule
 StatsRoute --> DBModule
 LoginRoute --> DBModule
+ReorderRoute --> DBModule
 DBModule --> Types
 SeedScript --> DBModule
 AuthContext --> LoginRoute
@@ -353,6 +419,7 @@ Layout --> AuthContext
 - [tech-items 路由](file://app/api/tech-items/route.ts#L1-L2)
 - [stats 路由](file://app/api/stats/route.ts#L1-L2)
 - [login 路由](file://app/api/login/route.ts#L1-L2)
+- [reorder 路由](file://app/api/reorder/route.ts#L1-L2)
 
 **章节来源**
 - [数据库模块](file://lib/db.ts#L1-L312)
@@ -363,14 +430,16 @@ Layout --> AuthContext
 ### 数据库优化
 
 1. **索引策略**: 使用 `display_order` 字段进行排序，确保查询性能
-2. **事务处理**: 对批量更新操作使用事务，保证数据一致性
+2. **事务处理**: 对批量更新操作使用事务，保证数据一致性和性能
 3. **连接管理**: 单例数据库连接，避免频繁创建连接
+4. **批量操作**: 批量排序使用单个事务处理多个更新，减少数据库往返
 
 ### API 性能
 
 1. **响应缓存**: 对只读查询结果可以考虑添加缓存层
 2. **批量操作**: 支持批量更新排序，减少多次往返
 3. **错误处理**: 统一的错误处理机制，避免异常传播
+4. **参数验证**: 在数据库层面进行参数验证，减少无效请求
 
 ### 前端优化
 
@@ -386,7 +455,7 @@ Layout --> AuthContext
 
 **症状**: API 调用返回 500 错误
 **原因**: 数据库文件不存在或权限不足
-**解决方案**: 
+**解决方案**:
 1. 确认 `data/techmap.db` 文件存在
 2. 检查数据库文件权限
 3. 重新执行 `npm run seed` 初始化数据库
@@ -409,12 +478,22 @@ Layout --> AuthContext
 2. 检查用户是否存在
 3. 验证密码是否匹配
 
+#### 批量排序错误
+
+**症状**: 批量排序返回 400 或 500 错误
+**原因**: 实体类型不正确或实体ID不存在
+**解决方案**:
+1. 确认 `entity_type` 参数值正确
+2. 检查实体ID是否存在于数据库中
+3. 验证 `display_order` 值的有效性
+
 ### 调试技巧
 
 1. **网络请求检查**: 使用浏览器开发者工具查看 API 请求和响应
 2. **数据库查询**: 在 SQLite 中直接查询数据验证状态
 3. **日志输出**: 在 API 路由中添加适当的日志输出
 4. **类型检查**: 利用 TypeScript 的类型检查发现潜在问题
+5. **批量操作验证**: 使用事务回滚测试批量操作的原子性
 
 ### API 测试工具
 
@@ -428,15 +507,19 @@ Layout --> AuthContext
 **章节来源**
 - [数据库模块](file://lib/db.ts#L14-L50)
 - [login 路由](file://app/api/login/route.ts#L15-L18)
+- [reorder 路由](file://app/api/reorder/route.ts#L1-L100)
 
 ## 结论
 
 Lantu Next 项目提供了一个完整的技术栈管理系统，具有清晰的 API 设计和良好的扩展性。系统采用现代技术栈，支持 RESTful API 规范，具备以下特点：
 
-1. **完整的 CRUD 支持**: 四个主要实体都支持完整的增删改查操作
+1. **完整的 CRUD 支持**: 五个主要实体都支持完整的增删改查操作
 2. **类型安全**: 使用 TypeScript 确保前后端数据一致性
 3. **简单认证**: 提供基本的用户认证功能
-4. **易于部署**: 支持多种部署方式，包括内网服务器部署
-5. **可扩展性**: 模块化设计便于功能扩展
+4. **批量操作**: 新增批量排序功能，提升管理效率
+5. **易于部署**: 支持多种部署方式，包括内网服务器部署
+6. **可扩展性**: 模块化设计便于功能扩展
+
+**更新** 最新版本增强了批量排序功能，支持对层级、分类和技术项进行高效批量管理，同时完善了认证机制和错误处理，为用户提供更加稳定可靠的服务。
 
 该系统适合用于技术栈管理、技能矩阵展示和团队知识管理等场景。通过合理的 API 设计和错误处理机制，为用户提供稳定可靠的服务。

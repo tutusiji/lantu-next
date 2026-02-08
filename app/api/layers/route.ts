@@ -8,7 +8,11 @@ export async function GET() {
     const layers = getLayers();
     return NextResponse.json(layers);
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch layers' }, { status: 500 });
+    console.error('[API /api/layers] 错误:', error);
+    return NextResponse.json({ 
+      error: 'Failed to fetch layers', 
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
 

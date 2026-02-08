@@ -2,58 +2,84 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 
+// 确保数据目录存在
 const dataDir = path.join(process.cwd(), "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
 const dbPath = path.join(dataDir, "techmap.db");
-const db = new Database(dbPath);
+console.log('[DB] 数据库路径:', dbPath);
+console.log('[DB] 数据库文件是否存在:', fs.existsSync(dbPath));
+
+let db: Database.Database;
+
+try {
+  db = new Database(dbPath);
+  console.log('[DB] 数据库连接成功');
+} catch (error) {
+  console.error('[DB] 数据库连接失败:', error);
+  throw error;
+}
 
 // 初始化数据库表
 export function initDb() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS categories (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      icon TEXT,
-      layer_id INTEGER NOT NULL,
-      display_order INTEGER DEFAULT 0
-    );
+  try {
+    console.log('[DB] 开始初始化数据库表...');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT,
+        layer_id INTEGER NOT NULL,
+        display_order INTEGER DEFAULT 0
+      );
 
-    CREATE TABLE IF NOT EXISTS tech_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      category_id INTEGER NOT NULL,
-      status TEXT NOT NULL CHECK(status IN ('active', 'missing')),
-      priority TEXT CHECK(priority IN ('high', 'medium', 'low', '')),
-      is_new INTEGER DEFAULT 0,
-      description TEXT,
-      tags TEXT,
-      display_order INTEGER DEFAULT 0,
-      FOREIGN KEY (category_id) REFERENCES categories(id)
-    );
+      CREATE TABLE IF NOT EXISTS tech_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category_id INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('active', 'missing')),
+        priority TEXT CHECK(priority IN ('high', 'medium', 'low', '')),
+        is_new INTEGER DEFAULT 0,
+        description TEXT,
+        tags TEXT,
+        display_order INTEGER DEFAULT 0,
+        FOREIGN KEY (category_id) REFERENCES categories(id)
+      );
 
-    CREATE TABLE IF NOT EXISTS layers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      icon TEXT,
-      display_order INTEGER DEFAULT 0
-    );
+      CREATE TABLE IF NOT EXISTS layers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT,
+        display_order INTEGER DEFAULT 0
+      );
 
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL
-    );
-  `);
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL
+      );
+    `);
+    console.log('[DB] 数据库表初始化完成');
+  } catch (error) {
+    console.error('[DB] 数据库表初始化失败:', error);
+    throw error;
+  }
 }
 
 // 获取所有层级
 export function getLayers() {
-  return db
-    .prepare("SELECT DISTINCT * FROM layers ORDER BY display_order")
-    .all();
+  try {
+    const result = db
+      .prepare("SELECT DISTINCT * FROM layers ORDER BY display_order")
+      .all();
+    console.log('[DB] 查询layers成功，记录数:', result.length);
+    return result;
+  } catch (error) {
+    console.error('[DB] 查询layers失败:', error);
+    throw error;
+  }
 }
 
 // 更新层级
@@ -296,7 +322,7 @@ export function clearDb() {
 // 获取用户
 export function getUser(username: string) {
   return db.prepare("SELECT * FROM users WHERE username = ?").get(username) as
-    | any
+    | { id: number; username: string; password: string }
     | undefined;
 }
 

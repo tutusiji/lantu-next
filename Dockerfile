@@ -74,9 +74,9 @@ RUN chown -R nextjs:nodejs ./data
 USER nextjs
 
 # 暴露端口
-EXPOSE 3000
+EXPOSE 4701
 
-ENV PORT=3000
+ENV PORT=4701
 ENV HOSTNAME="0.0.0.0"
 
 # 启动应用

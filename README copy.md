@@ -64,7 +64,7 @@ npm run seed
 npm run dev
 ```
 
-打开浏览器访问 [http://localhost:3000](http://localhost:3000)
+打开浏览器访问 [http://localhost:4701](http://localhost:4701)
 
 ## 页面说明
 

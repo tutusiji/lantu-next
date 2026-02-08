@@ -2,21 +2,20 @@ version: '3.8'
 
 services:
   lantu-next:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # 使用已加载的镜像
+    image: lantu-next:latest
     container_name: lantu-next-app
     restart: unless-stopped
     ports:
-      - "4701:3000"
+      - "4701:4701"
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=4701
     volumes:
-      # 持久化SQLite数据库
+      # 持久化SQLite数据库（首次部署需要从镜像复制数据）
       - ./data:/app/data
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4701', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
